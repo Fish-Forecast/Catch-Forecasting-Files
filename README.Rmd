@@ -2,7 +2,15 @@
 output: github_document
 ---
 
-[Return to Catch Forecast Webpage](https://fish-forecast.github.io/Catch-Forecasting-INCOIS/)
+<div style="float:left; width: 33.33%">
+[Workshop Main Page](https://rverse-tutorials.github.io/Fish-Forecast-Training-Course/index.html)
+</div>
+<div style="float:left; width: 33.33%">
+[Catch Forecast Webpage](https://fish-forecast.github.io/Catch-Forecasting-INCOIS/)
+</div>
+<div style="float:left; width: 33.33%">
+[RWorkflow Workshop Webpage](https://rverse-tutorials.github.io/RWorkflow-Workshop/)
+</div>
 
 # Catch-Forecasting-Files
 Lab scripts and Rmds for the INCOIS Catch Forecasting Workshop
