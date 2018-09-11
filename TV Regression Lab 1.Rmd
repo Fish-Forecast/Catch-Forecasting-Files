@@ -1,0 +1,165 @@
+---
+title: Time Varying Regression Lab 1
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# Load the data
+
+```{r load_data, fig.align = "center", fig.height = 4, fig.width = 8}
+load("landings.RData")
+landings$log.metric.tons = log(landings$metric.tons)
+landings = subset(landings, Year <= 1987)
+```
+
+# Look at the data
+
+```{r look_data}
+landings
+```
+
+# Subset the data
+
+```{r}
+val <- "Sardine"
+subset(landings, Species==val)
+```
+
+# Class of the data
+
+```{r class_data}
+class(data)
+```
+
+Because it is a data.frame, you can call the columns like so
+
+```{r call_col}
+landings$log.metric.tons
+```
+
+# Plot data with ggplot
+
+```{r plot_data, fig.align = "center", fig.height = 4, fig.width = 8}
+library(ggplot2)
+ggplot(subset(landings, Species==val), aes(x=Year, y=log.metric.tons)) +
+  geom_line()
+```
+
+# Plot data with base plot
+
+```{r plot_data2, fig.align = "center", fig.height = 4, fig.width = 8}
+dat <- subset(landings, Species==val)
+plot(dat$Year, dat$log.metric.tons, type="l")
+```
+
+---
+
+# Fit linear regression
+
+First add `t` to the data.  This is Year minus first Year.
+
+```{r}
+landings$t = landings$Year-landings$Year[1]
+```
+
+Use the poly function
+
+$$log(Sardine catch) = \alpha + \beta t + \beta_2 t^2 + \beta_3 t^3 + \beta_4 t^4 + e_t$$
+
+```{r tvreg.sardine3}
+model <- lm(log.metric.tons ~ poly(t,4), data=landings, subset=Species==val)
+```
+
+# Show summary of the fit
+
+```{r}
+summary(model)
+```
+
+# Fit a raw 4th order polynomial
+
+Normally you should use `poly()`.
+
+```{r}
+dat = subset(landings, Species==val)
+model <- lm(log.metric.tons ~ t + I(t^2) + I(t^3) + I(t^4), data=dat)
+```
+
+
+```{r}
+summary(model)
+```
+
+# Show the coefficients
+
+
+```{r}
+coef(model)
+```
+
+# Show the fitted values
+
+This is the model predicted values.
+
+```{r}
+fitted(model)
+```
+
+# Show the residuals
+
+This is the difference between the data and the fitted line.
+
+```{r}
+residuals(model)
+```
+
+# Plot model fit over the data
+
+```{r}
+plot(dat$t, dat$log.metric.tons)
+lines(dat$t, fitted(model))
+```
+
+or with ggplot
+
+```{r}
+fitted.df <- data.frame(t = dat$t, fitted=fitted(model))
+ggplot(dat, aes(x=t, y=log.metric.tons)) +
+  geom_point() +
+  geom_line(color='red',data = fitted.df, aes(x=t, y=fitted))
+```
+
+# Test the residuals for independence
+
+Here we will use the [Ljung-Box](https://en.wikipedia.org/wiki/Ljung–Box_test) test.
+
+`fitdf` is the number of estimated parameters in your model.  Look at the coefficiets to determine the number of estimated parameters.
+
+```{r}
+coef(model)
+```
+
+For the 4th-order polynomial, it is 5.  It is probably best to use the default `lag`.
+
+```{r}
+x <- resid(model)
+Box.test(x, type = "Ljung-Box", fitdf=5)
+```
+
+If the p-value is less than 0.05, it indicates support for temporally autocorrelated residuals, which means that your assumption of uncorrelated residuals is not supported.
+
+# Problems
+
+1. Fit a 1st order polynomial to the sardine data.  This is just $C_t = \alpha + \beta t + e_t$.
+
+1. Try fitting a 4-th order time-varying regression for one of the other species.
+
+```{r}
+unique(landings$Species)
+```
+
+a. Fit a 4th order polynomial.
+b. Do a `summary(model)` and evaluate what level of polynomial is supported.
+c. Plot the data and the fit on top.

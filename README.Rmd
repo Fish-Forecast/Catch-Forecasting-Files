@@ -1,0 +1,37 @@
+---
+output: github_document
+---
+
+# Catch-Forecasting-Files
+Lab scripts and Rmds for the INCOIS Catch Forecasting Workshop
+
+# Data
+
+```{r list_data_files, results='asis', echo=FALSE}
+files = dir(pattern="RData")
+if(length(files)!=0){
+str = paste0("[",files,"]","(",files,")",collapse="\n\n")
+cat(str)
+}
+```
+
+# Rmd Files
+
+```{r list_files, results='asis', echo=FALSE}
+files = dir(pattern="Rmd")
+files = files[!(files == "README.Rmd")]
+if(length(files)!=0){
+str = paste0("[",files,"]","(",files,")",collapse="\n\n")
+cat(str)
+}
+```
+
+# R Scripts
+
+```{r list_R_Scripts, results='asis', echo=FALSE}
+files = dir(pattern="[.]R$")
+if(length(files)!=0){
+str = paste0("[",files,"]","(",files,")",collapse="\n\n")
+cat(str)
+}
+```
