@@ -1,0 +1,162 @@
+---
+title: ARMA Models Lab 1
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+In this lab, you will simulate ARMA data and get a feel for what that data looks like and what the acf and pacf functions look like.  In developing forecasting models, you use simulation to test your modeling approaches and estimate the power of your fitting procedures.  
+
+# Create AR data with arima.sim()
+
+First read about the `arima.sim()` function by typing `?arima.sim` at the command line.  `arima.sim()` requires first `model` which is a list with the $\beta$'s in the AR equation:
+
+$$x_t = \beta_t x_{t-1} + \beta_2 x_{t-2} \dots + e_t$$
+The list is specified like so.  Include as many `beta`'s as needed.
+
+```
+list(ar = c( beta1, beta2, beta3, ... ))
+```
+
+## AR(1) data
+
+Let's start with an AR(1) process with $\beta_1 = 0.8$:
+
+$$x_t = 0.8 x_{t-1} + e_t, e_t \sim N(0,\sigma = 0.2)$$
+
+```{r arima.sim.ar1}
+beta1 <- 0.8
+sd <- 0.2
+sim1 <- arima.sim(n = 100, list(ar = c(beta1)), sd = sd)
+plot(sim1)
+```
+
+Change the `beta1` to 2.  Notice that you get a warning that the model is not stationary.  That means that $x_t = 2 x_{t-1} + e_t$ explodes (not stationary).  `arima.sim()` only simulates stationary models so $\beta_1$ must be less that 1 and greater than -1.
+
+Now try different `beta1` between 1 and -1 and get a feel for what kind AR(1) time series look like.
+
+## Look at the autocorrelation function (acf)
+
+```{r acf}
+beta1 <- 0.8
+sd <- 0.2
+sim1 <- arima.sim(n = 100, list(ar = c(beta1)), sd = sd)
+acf(sim1)
+```
+
+Notice how the autocorrelation slowly decreases.  That is a feature of AR(p) data and one of the first tests you should run on time-series data is the acf function to get a feel for how much autocorrelatin is in your data.  Try running `acf()` on simulated data from different `beta1` values.
+
+## Look at the partial autocorrelation function (pacf)
+
+```{r pacf}
+pacf(sim1)
+```
+
+Notice how the pacf goes to zero after 1.  That is a feature of a pure AR(1) process. Running `pacf()` on your time-series data will give you an idea of whether it is pure AR or if it is has some MA in it.  We will show MA after looking at some more AR processes.
+
+## Simulate AR(2) data
+
+An AR(2) process with $\beta_1 = 0.8$ and $\beta_2 = -0.4$ is:
+
+$$x_t = 0.8 x_{t-1} - 0.4 x_{t-2} + e_t, e_t \sim N(0,\sigma = 0.2)$$
+
+```{r arima.sim.ar2}
+beta1 <- 0.8
+beta2 <- -0.4
+sd <- 0.2
+sim2 <- arima.sim(n = 100, list(ar = c(beta1, beta2)), sd = sd)
+plot(sim2)
+```
+
+Look at the autocorrelation function (acf):
+
+```{r acf2}
+acf(sim2)
+```
+# Higher order AR models
+
+We can have higher order AR models such as an AR(3):
+
+$$x_t = \beta_1 x_{t-1} + \beta_2 x_{t-2} + \beta_3 x_{t-3} + e_t$$
+But models with some many lags ($\beta$) are difficult to estimate for fisheries data.  We see these models used for data with 10s of thousands of data points but not for fisheries catch data.
+
+# Create MA data with arima.sim()
+
+We can also create MA data by passing the MA components in the `model` list.  An MA model is:
+
+$$x_t = e_t + \theta_1 e_{t-1} + \theta_2 e_{t-2} + \dots$$
+The list is specified like so.  Include as many `thetas`'s as needed.
+
+```
+list(ma = c( theta1, theta2, ... ))
+```
+
+## MA data
+
+Let's simulate an MA(2) process with $\theta_1 = -0.2$ and $\theta_2 = 0.2$:
+
+$$x_t = e_t - 0.2 e_{t-1} + 0.2 e_{t-2}, e_t \sim N(0,\sigma = 0.2)$$
+
+```{r arima.sim.ma2}
+theta1 <- -0.2
+theta2 <- 0.2
+sd <- 0.5
+sim3 <- arima.sim(n = 1000, list(ma = c(theta1, theta2)), sd = sd)
+plot(sim3)
+```
+
+Now try different `theta1` and `theta2` to get a feel for what MA time series look like.  You may need to try a few values to find stationary models.
+
+## Look at the autocorrelation function (acf)
+
+```{r acf3}
+acf(sim3)
+```
+
+Notice how the autocorrelation drops below the dotted line after 2.  That is a feature of MA(2) data.  If we simulated MA(1) data (one $\theta$) then it would cut off after 1.  I used n=1000 so you can see the pattern in the acf more clearly.
+
+## Look at the partial autocorrelation function (pacf)
+
+```{r pacf3}
+pacf(sim3)
+```
+
+Notice how the pacf gradually slowly goes below the dashed blue lines over 1 to 5 on the x-axis.  That is a feature of MA models.
+
+## Simulate ARMA data
+
+We can simulation ARMA data with both AR and MA components also:
+
+$$x_t = 0.8 x_{t-1} - 0.4 x_{t-2} + e_t - 0.2 e_{t-1} + 0.2 e_{t-2}$$
+
+```{r arima.sim.ar4}
+beta1 <- 0.8
+beta2 <- -0.4
+theta1 <- -0.2
+theta2 <- 0.2
+sd <- 0.2
+sim4 <- arima.sim(n = 100, list(ar = c(beta1, beta2), ma=c(theta1, theta2)), sd = sd)
+plot(sim4)
+```
+
+Look at the autocorrelation function (acf):
+
+```{r acf4}
+acf(sim4)
+```
+
+and the partial autocorrelation function (pacf):
+
+```{r pacf4}
+pacf(sim4)
+```
+
+
+# Problems
+
+1. Change the $\beta$ values in the AR models to negative (but greater than -1).  What happens?
+
+1. Increase the sd values.  What happens?
+
+1. In the AR(1) model, make $\beta_1$ very small (close to 0) and very big (close to 1).  How are the data different?  Look at the acf for each.  How are they different?
