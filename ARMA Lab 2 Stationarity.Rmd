@@ -1,0 +1,310 @@
+---
+title: ARMA Models Lab 2
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+In this lab, you will practice doing diagnostics on real catch data and testing for stationarity.  You will also practice transforming data so that it passes the stationarity tests.  
+
+We do this because the standard algorithms for ARMA models assume stationarity and we will be using those algorithms.  Note that it possible to fit models that are non-stationary.  However, that is not commonly done in the literature on forecasting with ARMA models, certainly not in the literature on catch forecasting.  I will touch on dealing with non-stationarity on the last day.
+
+# Set-up
+
+
+If you have not loaded the setup package with the Greek landings data, do so now.  You would have needed this for the TV Regression lab, so you should not need to do this again.
+
+```
+library(devtools)
+devtools::install_github("RVerse-Tutorials/RWorkflowsetup")
+```
+
+We will use the data before 1989 for the lab and you will look at the later data in the problems.
+
+```{r read_data}
+load("landings.RData")
+landings$log.metric.tons = log(landings$metric.tons)
+landings = subset(landings, Year <= 1989)
+```
+
+Load the necessary packages.
+
+```{r load_packages}
+library(ggplot2)
+library(gridExtra)
+library(reshape2)
+library(tseries)
+library(urca)
+```
+
+# Look at stationarity in simulated data
+
+We will start by looking at white noise and a stationary AR(1) process from simulated data.  White noise is simply a string of random numbers drawn from a Normal distribution.  `rnorm()` with return random numbers drawn from a Normal distribution.  Use `?rnorm` to understand what the function requires.
+
+
+```{r white_noise}
+TT=100
+y = rnorm(TT, mean=0, sd=1) # 100 random numbers
+op=par(mfrow=c(1,2))
+plot(y, type="l")
+acf(y)
+par(op)
+```
+
+Here we use `ggplot()` to plot 10 white noise time series.
+
+```{r white.noise.ggplot}
+dat = data.frame(t=1:TT, y=y)
+p1 = ggplot(dat, aes(x=t, y=y)) + geom_line() + 
+  ggtitle("1 white noise time series") + xlab("") + ylab("value")
+ys = matrix(rnorm(TT*10),TT,10)
+ys = data.frame(ys)
+ys$id = 1:TT
+
+ys2=melt(ys, id.var="id")
+p2 = ggplot(ys2, aes(x=id,y=value,group=variable)) +
+  geom_line() + xlab("") + ylab("value") +
+  ggtitle("10 white noise processes")
+grid.arrange(p1, p2, ncol = 1)
+```
+
+These are stationary because the variance and mean (level) does not change with time.
+
+An AR(1) process is also stationary.
+
+```{r ar1.plot}
+theta=0.8
+nsim=10
+ar1=arima.sim(TT, model=list(ar=theta))
+plot(ar1)
+```
+
+We can use ggplot to plot 10 AR(1) time series, but we need to change the data to a data frame.
+
+```{r ar1.ggplot}
+dat = data.frame(t=1:TT, y=ar1)
+p1 = ggplot(dat, aes(x=t, y=y)) + geom_line() + 
+  ggtitle("AR-1") + xlab("") + ylab("value")
+ys = matrix(0,TT,nsim)
+for(i in 1:nsim) ys[,i]=as.vector(arima.sim(TT, model=list(ar=theta)))
+ys = data.frame(ys)
+ys$id = 1:TT
+
+ys2=melt(ys, id.var="id")
+p2 = ggplot(ys2, aes(x=id,y=value,group=variable)) +
+  geom_line() + xlab("") + ylab("value") +
+  ggtitle("The variance of an AR-1 process is steady")
+grid.arrange(p1, p2, ncol = 1)
+```
+
+# Stationary around a linear trend
+
+Fluctuating around a linear trend is a very common type of stationarity used in ARMA modeling and forecasting.  This is just a stationary process (like white noise or AR(1)) around an linear trend up or down.
+
+```{r wn.w.linear.trend}
+intercept = .5
+trend=.1
+sd=0.5
+TT=20
+wn=rnorm(TT, sd=sd) #white noise
+wni = wn+intercept #white noise witn interept
+wnti = wn + trend*(1:TT) + intercept
+```
+
+See how the white noise with trend is just the white noise overlaid on a linear trend.
+
+```{r wnt.plot}
+op=par(mfrow=c(1,3))
+plot(wn, type="l")
+plot(trend*1:TT)
+plot(wnti, type="l")
+par(op)
+```
+
+We can make a similar plot with ggplot.
+
+```{r wnt.ggplot}
+dat = data.frame(t=1:TT, wn=wn, wni=wni, wnti=wnti)
+p1 = ggplot(dat, aes(x=t, y=wn)) + geom_line() + ggtitle("White noise")
+p2 = ggplot(dat, aes(x=t, y=wni)) + geom_line() + ggtitle("with non-zero mean")
+p3 = ggplot(dat, aes(x=t, y=wnti)) + geom_line() + ggtitle("with linear trend")
+grid.arrange(p1, p2, p3, ncol = 3)
+```
+
+We can make a similar plot with AR(1) data.  Ignore the warnings about not knowing how to pick the scale.
+
+```{r ar1.trend.plot}
+beta1 <- 0.8
+ar1 <- arima.sim(TT, model=list(ar=beta1), sd=sd)
+ar1i <- ar1 + intercept
+ar1ti <- ar1 + trend*(1:TT) + intercept
+dat = data.frame(t=1:TT, ar1=ar1, ar1i=ar1i, ar1ti=ar1ti)
+p4 = ggplot(dat, aes(x=t, y=ar1)) + geom_line() + ggtitle("AR1")
+p5 = ggplot(dat, aes(x=t, y=ar1i)) + geom_line() + ggtitle("with non-zero mean")
+p6 = ggplot(dat, aes(x=t, y=ar1ti)) + geom_line() + ggtitle("with linear trend")
+
+grid.arrange(p4, p5, p6, ncol = 3)
+```
+
+
+# Testing the Greek landing data for stationarity
+
+Let's test the Greek landing data for stationarity.  The first step is always to plot your data.  We will do the tests with the anchovies.  Notice the two `==` in the subset call not one `=`.
+
+```{r anchovy}
+dat <- subset(landings, Species=="Anchovy")
+dat <- dat$log.metric.tons
+```
+
+## Plot the data
+
+```{r anchovy.plot}
+plot(dat, type="l")
+```
+
+## Questions to ask
+
+* Does it have a trend (goes up or down)? Yes, definitely
+* Does it have a non-zero mean?  Yes
+* Does it look like it might be stationary around a trend? Yes
+
+# Augmented Dickey-Fuller test
+
+We will use the stationarity tests in the tseries package as these are simpler to interpret.  In the `Lab 2 Extras.Rmd` file, I go into these tests in more in depth and use the urca package functions.
+
+The null hypothesis for the Dickey-Fuller test is that the data are non-stationary.  We want to REJECT the null hypothesis for this test, so we want a p-value of less that 0.05 (or smaller).
+
+## Test simulated data
+
+Let's start by doing the test on data that we know are stationary, white noise.  Use `?adf.test` to read about this function.  The default values are generally fine.
+
+```{r df.wn}
+require(tseries)
+TT <- 100
+wn <- rnorm(TT) # white noise
+adf.test(wn)
+```
+The null hypothesis is rejected.
+
+Try the test on white noise with a trend and intercept.
+
+```{r df.wn.trend}
+wnt <- wn + 1:TT + intercept
+adf.test(wnt)
+```
+
+The null hypothesis is still rejected.  `adf.test()` uses a model that allows an intercept and trend.
+
+Let's try the test on a random walk (nonstationary).
+
+```{r df.rw}
+rw <- cumsum(rnorm(TT))
+adf.test(rw)
+```
+
+The null hypothesis is NOT reject as the p-value is greater than 0.05.
+
+# Augmented Dickey-Fuller test on the anchovy data
+
+```{r df.anchovy}
+adf.test(dat)
+```
+The p-value is greater than 0.05.  We cannot reject the null hypothesis, meaning the data are non-stationary.  We will also do a KPSS test for stationarity.
+
+# KPSS test
+
+The null hypothesis for the KPSS test is that the data are stationary.  For this test, we do NOT want to reject the null hypothesis.  In other words, we want the p-value to be greater than 0.05 not less than 0.05.
+
+
+Let's try the KPSS test on white noise with a trend.  The default is a null hypothesis with no trend.  We will change this to `null="Trend"`.
+
+```{r kpss.wnt}
+kpss.test(wnt, null="Trend")
+```
+
+The p-value is greater than 0.05.  The null hypothesis of stationarity around a trend is not rejected.
+
+Let's try the anchovy data.
+
+```{r kpss.wnt}
+kpss.test(dat, null="Trend")
+```
+
+The null is rejected (p-value less than 0.05).  Again stationarity is not supported.
+
+# Dealing with non-stationarity
+
+The anchovy data have failed both tests for the stationarity, the Augmented Dickey-Fuller and the KPSS test.  How to we fix this?  The standard approach is to use differencing.
+
+Let's see how this works with random walk data.  A random walk is non-stationary but the difference is white noise so is stationary:
+
+$$x_t - x_{t-1} = e_t, e_t \sim N(0,\sigma)$$
+```{r adf.wn.diff}
+adf.test(diff(wn))
+kpss.test(diff(wn))
+```
+If we different random walk data, the null is rejected for the ADF test and not rejected for the KPSS test.  This is what we want.
+
+Let's try a single difference with the anchovy data.  A single difference means `dat(t)-dat(t-1)`.  We get this using `diff(dat)`.
+
+```{r adf.anchovy.diff}
+diff1dat <- diff(dat)
+adf.test(diff1dat)
+kpss.test(diff1dat)
+```
+
+A single difference of the anchovy data get us what we want.  If a first difference were not enough, we would try a second difference which is the difference of a first difference.
+
+```{r second.diff}
+diff2dat <- diff(diff1dat)
+```
+
+As an alternative to trying many different differences, you can use the `ndiffs()` function in the forecast package.  This automates finding the number of differences needed.
+
+```{r ndiff}
+require(forecast)
+ndiffs(dat, test="kpss")
+ndiffs(dat, test="adf")
+
+```
+One difference is required to pass both the ADF and KPSS stationarity tests.
+
+# Summary
+
+The basic stationarity diagnostics are the following
+
+* Plot your data.  Look for
+  - An increasing trend
+  - A non-zero level (if no trend)
+  - Strange shocks or steps in your data (indicating something dramatic changed like the data collection methodology)
+* Apply stationarity tests
+  - `adf.test()` p-value should be less than 0.05 (reject null)
+  - `kpss.test()` p-value should be greater than 0.05 (do not reject null)
+* If stationarity tests are failed, then try differencing to correct
+  - Try `ndiffs()` in the forecast package or manually try different differences.
+  
+# Problems
+
+1. Repeat the stationarity tests for another species in the landings data set.  Sardine, Chub.mackerel, and Horse.mackerel have enough data. Here is how to set up the data for another species.  Go through all the tests.
+
+```{r get.another.species}
+datdf <- subset(landings, Species=="Chub.mackerel")
+dat <- datdf$log.metric.tons
+```
+
+2. Repeat the tests for anchovy using the full data.  The full data go to 2007.  Do the conclusions re stationarity and the amount of differencing needed change?
+
+```{r read_data_prob2}
+load("landings.RData")
+landings$log.metric.tons = log(landings$metric.tons)
+datdf <- subset(landings, Species=="Anchovy")
+dat <- datdf$log.metric.tons
+```
+
+3. Now repeat the tests for anchovy with only the data after 1987.  Do the conclusions regarding stationarity of the data change? Does the amount of differencing to achieve stationarity change?
+
+```{r read_recent_anchovy_dat}
+datdf <- subset(landings, Species=="Anchovy" & Year>1987)
+dat <- datdf$log.metric.tons
+```
